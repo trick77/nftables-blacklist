@@ -138,7 +138,7 @@ Enable it:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable nftables-blacklist.service
+sudo systemctl enable --now nftables-blacklist.service
 ```
 
 ## Automatic Updates (Systemd Timer)
