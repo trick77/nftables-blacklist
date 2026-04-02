@@ -756,12 +756,12 @@ main() {
 
   # Apply whitelist if we have entries
   if [[ "$has_whitelist" == "yes" ]]; then
+    local before_wl after_wl
     # Apply IPv4 whitelist
     if [[ -s "$ipv4_clean" ]] && [[ -s "$whitelist_v4" ]]; then
       log_info "Applying IPv4 whitelist..."
       local ipv4_filtered
       ipv4_filtered=$(make_temp)
-      local before_wl after_wl
       before_wl=$(wc -l < "$ipv4_clean")
 
       if apply_whitelist "$ipv4_clean" "$whitelist_v4" "$ipv4_filtered" "4"; then
