@@ -30,7 +30,7 @@ Blacklist update complete
   IPv4: 66178  IPv6: 23927  Total: 90105
 ```
 
-> Looking for the old ipset/iptables version? See the [archive/](archive/) folder.
+> **Tip:** Use [lens.ipverse.net](https://lens.ipverse.net) to look up the ASN, owner, and network ranges of an IP — useful for picking ASNs/countries to block or for figuring out who a dropped IP belongs to.
 
 ## Table of Contents
 
@@ -321,6 +321,8 @@ sysctl -p /etc/sysctl.d/99-nftables.conf
 ```
 
 ## Migrating from the old ipset/iptables version
+
+> Looking for the old ipset/iptables version? See the [archive/](archive/) folder.
 
 1. Remove the old ipset/iptables rules and clean up legacy files. The exact paths may vary depending on how you originally set it up — the commands below are examples based on the default configuration:
    ```bash
