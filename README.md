@@ -30,6 +30,8 @@ Blacklist update complete
   IPv4: 66178  IPv6: 23927  Total: 90105
 ```
 
+> **Tip:** Use [lens.ipverse.net](https://lens.ipverse.net) to look up the ASN, owner, and network ranges of an IP — useful for picking ASNs/countries to block or for figuring out who a dropped IP belongs to.
+
 > Looking for the old ipset/iptables version? See the [archive/](archive/) folder.
 
 ## Table of Contents
