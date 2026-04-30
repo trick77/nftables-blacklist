@@ -43,6 +43,9 @@ Blacklist update complete
 - [Configuration Options](#configuration-options)
 - [Customizing Blacklists](#customizing-blacklists)
 - [Whitelist (Prevent Self-Blocking)](#whitelist-prevent-self-blocking)
+  - [Manual Whitelist](#manual-whitelist)
+  - [External whitelist files](#external-whitelist-files)
+  - [Auto-Detect Server IPs](#auto-detect-server-ips)
 - [Dry Run Mode](#dry-run-mode)
 - [Cron Mode](#cron-mode)
 - [Troubleshooting](#troubleshooting)
@@ -255,6 +258,39 @@ WHITELIST=(
 For IPv4, whitelisting a range like `10.0.0.0/8` will correctly exclude all IPs in that range, even if the blacklist contains individual IPs like `10.1.2.3`.
 
 **Note:** IPv6 whitelist only matches exact addresses (CIDR ranges not supported for IPv6 whitelist).
+
+### External whitelist files
+
+`WHITELIST` entries may also be `file://` URLs pointing at a flat text file (one IP/CIDR per line, `#` starts a comment, blank lines are ignored). This lets you keep large or dynamically-generated whitelists outside the bash config:
+
+```bash
+WHITELIST=(
+    "203.0.113.10"
+    "file:///etc/nftables-blacklist/extra.list"
+)
+```
+
+If the file is missing or unreadable, the script aborts before applying any rules — silently dropping a configured whitelist would let IPs you intended to protect get blacklisted, which is exactly what this feature exists to prevent.
+
+**Recipe: dynamic whitelist from a JSON API**
+
+To whitelist e.g. all Mullvad WireGuard relays (or any other JSON endpoint), schedule a small cron job that writes a flat list using `jq`, then point a `WHITELIST` entry at it:
+
+```bash
+# /etc/cron.daily/refresh-mullvad-whitelist
+#!/bin/sh
+curl -fsSL https://api.mullvad.net/app/v1/relays \
+  | jq -r '.wireguard.relays[].ipv4_addr_in' \
+  > /etc/nftables-blacklist/mullvad.list
+```
+
+```bash
+WHITELIST=(
+    "file:///etc/nftables-blacklist/mullvad.list"
+)
+```
+
+Run the cron before `update-blacklist.sh` (or schedule the cron earlier in the day). `jq` is the user's tool, not a dependency of this project — use whatever preprocessing you like (`jq`, `awk`, `python`, hand-edited) as long as the result is one IP/CIDR per line.
 
 ### Auto-Detect Server IPs
 

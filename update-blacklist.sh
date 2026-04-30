@@ -719,12 +719,32 @@ main() {
   whitelist_v6=$(make_temp)
   local has_whitelist=no
 
-  # Collect manual whitelist entries
+  # Collect manual whitelist entries.
+  # Each entry is either a literal IP/CIDR or a "file://" URL pointing at a
+  # flat list (one IP/CIDR per line, '#' starts a comment). Files let users
+  # plug in externally-generated whitelists (e.g. a cron-driven jq pipeline
+  # against Mullvad/cloud-provider APIs) without coupling that tooling to
+  # this script.
   if [[ -n "${WHITELIST[*]:-}" ]]; then
     for entry in "${WHITELIST[@]}"; do
       [[ -z "$entry" ]] && continue
-      # Determine if IPv4 or IPv6 based on presence of colon
-      if [[ "$entry" == *:* ]]; then
+      if [[ "$entry" == file://* ]]; then
+        local wl_path="${entry#file://}"
+        if [[ ! -r "$wl_path" ]]; then
+          die "WHITELIST file not readable: $wl_path"
+        fi
+        local line
+        while IFS= read -r line || [[ -n "$line" ]]; do
+          line="${line%%#*}"
+          line="${line//[[:space:]]/}"
+          [[ -z "$line" ]] && continue
+          if [[ "$line" == *:* ]]; then
+            echo "$line" >> "$whitelist_v6"
+          else
+            echo "$line" >> "$whitelist_v4"
+          fi
+        done < "$wl_path"
+      elif [[ "$entry" == *:* ]]; then
         echo "$entry" >> "$whitelist_v6"
       else
         echo "$entry" >> "$whitelist_v4"
