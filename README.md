@@ -43,6 +43,9 @@ Blacklist update complete
 - [Configuration Options](#configuration-options)
 - [Customizing Blacklists](#customizing-blacklists)
 - [Whitelist (Prevent Self-Blocking)](#whitelist-prevent-self-blocking)
+  - [Manual Whitelist](#manual-whitelist)
+  - [JSON Whitelist Sources (jq)](#json-whitelist-sources-jq)
+  - [Auto-Detect Server IPs](#auto-detect-server-ips)
 - [Dry Run Mode](#dry-run-mode)
 - [Cron Mode](#cron-mode)
 - [Troubleshooting](#troubleshooting)
@@ -65,6 +68,7 @@ Blacklist update complete
 - nftables
 - iprange - combines overlapping IP ranges and handles whitelist subtraction
 - curl, grep, sed, sort, wc (usually pre-installed)
+- jq - **optional**, only required if you use `WHITELIST_JSON_SOURCES` to extract whitelist IPs from JSON endpoints
 
 ## Quick Start (Debian/Ubuntu)
 
@@ -255,6 +259,25 @@ WHITELIST=(
 For IPv4, whitelisting a range like `10.0.0.0/8` will correctly exclude all IPs in that range, even if the blacklist contains individual IPs like `10.1.2.3`.
 
 **Note:** IPv6 whitelist only matches exact addresses (CIDR ranges not supported for IPv6 whitelist).
+
+### JSON Whitelist Sources (jq)
+
+If a provider publishes their IP ranges as JSON (e.g. cloud providers, VPN services), you can pull the IPs directly into the whitelist using `jq` filters. Each entry in `WHITELIST_JSON_SOURCES` has the form `URL|JQ_FILTER` (split on the first `|` so filter operators like `//` and `|` are preserved).
+
+```bash
+WHITELIST_JSON_SOURCES=(
+    # Mullvad WireGuard relay IPv4 addresses (remote URL)
+    "https://api.mullvad.net/app/v1/relays|.wireguard.relays[].ipv4_addr_in"
+
+    # Local JSON file (alternative to a plain text list)
+    # e.g. [ "203.0.113.10", "198.51.100.0/24", "2001:db8::1" ]
+    "file:///etc/nftables-blacklist/my-whitelist.json|.[]"
+)
+```
+
+The filter must emit one IP or CIDR per line on stdout. IPv4 vs IPv6 routing is automatic (entries containing `:` go to the IPv6 whitelist).
+
+`jq` is only required when this array has entries. Install with `apt install jq`. If `WHITELIST_JSON_SOURCES` is empty (the default), the script runs without `jq` installed.
 
 ### Auto-Detect Server IPs
 

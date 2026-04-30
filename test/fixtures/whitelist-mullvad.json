@@ -1,0 +1,24 @@
+{
+  "wireguard": {
+    "relays": [
+      {
+        "hostname": "test-wg-001",
+        "ipv4_addr_in": "185.213.154.66",
+        "ipv6_addr_in": "2a03:1b20:1:f011::a01f"
+      },
+      {
+        "hostname": "test-wg-002",
+        "ipv4_addr_in": "185.213.154.67",
+        "ipv6_addr_in": "2a03:1b20:1:f011::a020"
+      },
+      {
+        "hostname": "test-wg-003",
+        "ipv4_addr_in": "193.32.127.66",
+        "ipv6_addr_in": "2a03:1b20:5:f011::a02a"
+      }
+    ]
+  },
+  "openvpn": {
+    "relays": []
+  }
+}

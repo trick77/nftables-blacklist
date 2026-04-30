@@ -306,6 +306,58 @@ apply_whitelist() {
   return 0
 }
 
+# Fetch JSON whitelist sources, apply jq filter, and append extracted IPs
+# Arguments:
+#   $1 - output file for IPv4 entries (appended)
+#   $2 - output file for IPv6 entries (appended)
+# Returns: 0 if at least one entry was added, 1 otherwise
+fetch_json_whitelist() {
+  local v4_out="$1" v6_out="$2"
+  local added=0
+  local entry url filter tmp jq_out ip count
+
+  for entry in "${WHITELIST_JSON_SOURCES[@]:-}"; do
+    [[ -z "$entry" ]] && continue
+    [[ "$entry" =~ ^# ]] && continue
+
+    # Split on first '|' so jq filters containing '|' (alt operator) survive
+    url="${entry%%|*}"
+    filter="${entry#*|}"
+
+    if [[ "$url" == "$entry" ]] || [[ -z "$url" ]] || [[ -z "$filter" ]]; then
+      log_warn "Invalid WHITELIST_JSON_SOURCES entry (expected URL|FILTER): $entry"
+      continue
+    fi
+
+    tmp=$(make_temp)
+    if ! download_blacklist "$url" "$tmp"; then
+      continue
+    fi
+
+    jq_out=$(make_temp)
+    if ! jq -r "$filter" "$tmp" > "$jq_out" 2>/dev/null; then
+      log_warn "jq filter failed for $url (filter: $filter)"
+      continue
+    fi
+
+    count=0
+    while IFS= read -r ip || [[ -n "$ip" ]]; do
+      [[ -z "$ip" ]] && continue
+      if [[ "$ip" == *:* ]]; then
+        echo "$ip" >> "$v6_out"
+      else
+        echo "$ip" >> "$v4_out"
+      fi
+      ((count++)) || true
+    done < "$jq_out"
+
+    log_info "  Loaded $count IPs from $url"
+    (( count > 0 )) && added=1
+  done
+
+  return $(( added == 1 ? 0 : 1 ))
+}
+
 #=============================================================================
 # NFTABLES MANAGEMENT FUNCTIONS
 #=============================================================================
@@ -569,6 +621,9 @@ main() {
     fi
   fi
 
+  # Default optional arrays if not declared in config
+  [[ "$(declare -p WHITELIST_JSON_SOURCES 2>/dev/null)" == "declare -a"* ]] || WHITELIST_JSON_SOURCES=()
+
   # Apply defaults for optional settings
   : "${NFT_TABLE_NAME:=blacklist}"
   : "${NFT_SET_NAME_V4:=blacklist4}"
@@ -584,6 +639,10 @@ main() {
 
   # Validate required commands
   local required_cmds=(curl grep sed sort wc iprange)
+  # jq is only required when JSON whitelist sources are configured
+  if (( ${#WHITELIST_JSON_SOURCES[@]:-0} > 0 )); then
+    required_cmds+=(jq)
+  fi
   for cmd in "${required_cmds[@]}"; do
     if ! exists "$cmd"; then
       die "Required command not found: $cmd (install with: apt install $cmd)"
@@ -731,6 +790,14 @@ main() {
       fi
     done
     has_whitelist=yes
+  fi
+
+  # Fetch JSON whitelist sources (jq-extracted)
+  if (( ${#WHITELIST_JSON_SOURCES[@]:-0} > 0 )); then
+    log_info "Fetching JSON whitelist sources..."
+    if fetch_json_whitelist "$whitelist_v4" "$whitelist_v6"; then
+      has_whitelist=yes
+    fi
   fi
 
   # Auto-detect server IPs if enabled

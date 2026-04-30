@@ -1,0 +1,16 @@
+# Synthetic blacklist for whitelist matrix tests
+# Contains:
+#   - one Mullvad IP (185.213.154.66) - whitelisted via JSON
+#   - one GCP IPv4 inside 34.0.0.0/15 (34.0.5.5) - whitelisted via JSON CIDR
+#   - one literal whitelist IP (203.0.113.99) - whitelisted via WHITELIST array
+#   - one normal IP (1.2.3.4) - must survive
+#   - one literal IPv6 whitelist target (2001:db8:dead::1) - whitelisted via WHITELIST array
+#   - one normal IPv6 (2001:4860:4860::8888) - must survive
+#   - GCP IPv6 CIDR exact entry (2600:1900::/32) - whitelisted via JSON exact match
+185.213.154.66
+34.0.5.5
+203.0.113.99
+1.2.3.4
+2001:db8:dead::1
+2001:4860:4860::8888
+2600:1900::/32
