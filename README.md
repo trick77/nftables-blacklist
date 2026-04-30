@@ -279,6 +279,8 @@ The filter must emit one IP or CIDR per line on stdout. IPv4 vs IPv6 routing is 
 
 `jq` is only required when this array has entries. Install with `apt install jq`. If `WHITELIST_JSON_SOURCES` is empty (the default), the script runs without `jq` installed.
 
+**Fail-fast behavior:** if a JSON whitelist source fails (download error, malformed jq filter, missing `jq`), the script aborts before applying any rules. Silently skipping a configured whitelist source would let provider IPs you intended to protect end up blacklisted — exactly the failure mode this feature exists to prevent. A filter that produces zero IPs is logged as a warning but does not abort.
+
 ### Auto-Detect Server IPs
 
 To automatically whitelist your server's own IPs (recommended):

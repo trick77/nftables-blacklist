@@ -306,7 +306,10 @@ apply_whitelist() {
   return 0
 }
 
-# Fetch JSON whitelist sources, apply jq filter, and append extracted IPs
+# Fetch JSON whitelist sources, apply jq filter, and append extracted IPs.
+# Fail-fast on download or jq errors: under-whitelisting is the inverse risk
+# this feature exists to prevent (silently letting your VPN endpoints get
+# blacklisted because the relay API hiccupped is the wrong default).
 # Arguments:
 #   $1 - output file for IPv4 entries (appended)
 #   $2 - output file for IPv6 entries (appended)
@@ -318,26 +321,23 @@ fetch_json_whitelist() {
 
   for entry in "${WHITELIST_JSON_SOURCES[@]:-}"; do
     [[ -z "$entry" ]] && continue
-    [[ "$entry" =~ ^# ]] && continue
 
     # Split on first '|' so jq filters containing '|' (alt operator) survive
     url="${entry%%|*}"
     filter="${entry#*|}"
 
     if [[ "$url" == "$entry" ]] || [[ -z "$url" ]] || [[ -z "$filter" ]]; then
-      log_warn "Invalid WHITELIST_JSON_SOURCES entry (expected URL|FILTER): $entry"
-      continue
+      die "Invalid WHITELIST_JSON_SOURCES entry (expected URL|FILTER): $entry"
     fi
 
     tmp=$(make_temp)
-    if ! download_blacklist "$url" "$tmp"; then
-      continue
+    if ! download_blacklist "$url" "$tmp" || [[ ! -s "$tmp" ]]; then
+      die "Failed to download whitelist source: $url"
     fi
 
     jq_out=$(make_temp)
     if ! jq -r "$filter" "$tmp" > "$jq_out" 2>/dev/null; then
-      log_warn "jq filter failed for $url (filter: $filter)"
-      continue
+      die "jq filter failed for $url (filter: $filter)"
     fi
 
     count=0
@@ -351,8 +351,12 @@ fetch_json_whitelist() {
       ((count++)) || true
     done < "$jq_out"
 
-    log_info "  Loaded $count IPs from $url"
-    (( count > 0 )) && added=1
+    if (( count > 0 )); then
+      log_info "  Loaded $count IPs from $url"
+      added=1
+    else
+      log_warn "  Filter produced 0 IPs from $url (filter: $filter)"
+    fi
   done
 
   return $(( added == 1 ? 0 : 1 ))

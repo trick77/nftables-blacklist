@@ -62,27 +62,33 @@ teardown() {
   assert_file_contains_lines "$V6_OUT" "2600:1900::/32" "2607:f8b0::/32"
 }
 
-@test "fetch_json_whitelist: malformed jq filter warns and skips, does not abort" {
+@test "fetch_json_whitelist: malformed jq filter dies (fail-fast)" {
   WHITELIST_JSON_SOURCES=(
     "file://${FIXTURES_DIR}/whitelist-mullvad.json|.this is not valid jq[("
-    "file://${FIXTURES_DIR}/whitelist-mullvad.json|.wireguard.relays[].ipv4_addr_in"
   )
 
   run fetch_json_whitelist "$V4_OUT" "$V6_OUT"
 
-  [ "$status" -eq 0 ]
+  [ "$status" -ne 0 ]
   [[ "$output" == *"jq filter failed"* ]]
-  # Second valid entry should still produce output
-  assert_file_contains_lines "$V4_OUT" "185.213.154.66"
 }
 
-@test "fetch_json_whitelist: invalid entry without pipe is rejected" {
+@test "fetch_json_whitelist: invalid entry without pipe dies" {
   WHITELIST_JSON_SOURCES=("file://${FIXTURES_DIR}/whitelist-mullvad.json")
 
   run fetch_json_whitelist "$V4_OUT" "$V6_OUT"
 
-  [ "$status" -eq 1 ]
+  [ "$status" -ne 0 ]
   [[ "$output" == *"Invalid WHITELIST_JSON_SOURCES entry"* ]]
+}
+
+@test "fetch_json_whitelist: download failure dies (fail-fast)" {
+  WHITELIST_JSON_SOURCES=("file://${BATS_TMPDIR}/does-not-exist-$$.json|.[]")
+
+  run fetch_json_whitelist "$V4_OUT" "$V6_OUT"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Failed to download whitelist source"* ]]
 }
 
 @test "fetch_json_whitelist: filter containing additional pipes is preserved (split on first |)" {
