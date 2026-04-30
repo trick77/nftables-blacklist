@@ -640,7 +640,7 @@ main() {
   # Validate required commands
   local required_cmds=(curl grep sed sort wc iprange)
   # jq is only required when JSON whitelist sources are configured
-  if (( ${#WHITELIST_JSON_SOURCES[@]:-0} > 0 )); then
+  if (( ${#WHITELIST_JSON_SOURCES[@]} > 0 )); then
     required_cmds+=(jq)
   fi
   for cmd in "${required_cmds[@]}"; do
@@ -793,7 +793,7 @@ main() {
   fi
 
   # Fetch JSON whitelist sources (jq-extracted)
-  if (( ${#WHITELIST_JSON_SOURCES[@]:-0} > 0 )); then
+  if (( ${#WHITELIST_JSON_SOURCES[@]} > 0 )); then
     log_info "Fetching JSON whitelist sources..."
     if fetch_json_whitelist "$whitelist_v4" "$whitelist_v6"; then
       has_whitelist=yes
