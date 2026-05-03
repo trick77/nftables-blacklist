@@ -110,6 +110,26 @@ EOF
   [[ "$output" == *"WHITELIST file not readable"* ]]
 }
 
+@test "WHITELIST: rejects https:// URL with a clear error" {
+  local cfg="${BATS_TMPDIR}/test-config-https.conf"
+  write_config "$cfg" '"https://example.com/list.txt"'
+
+  run "${SCRIPT_PATH}" --dry-run "$cfg"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"WHITELIST does not support URL scheme"* ]]
+}
+
+@test "WHITELIST: rejects http:// URL with a clear error" {
+  local cfg="${BATS_TMPDIR}/test-config-http.conf"
+  write_config "$cfg" '"http://example.com/list.txt"'
+
+  run "${SCRIPT_PATH}" --dry-run "$cfg"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"WHITELIST does not support URL scheme"* ]]
+}
+
 @test "file:// WHITELIST: mixed literal + file entries both apply" {
   cat > "${WL_INCLUDE}" <<'EOF'
 185.213.154.66

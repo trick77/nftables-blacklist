@@ -744,6 +744,13 @@ main() {
             echo "$line" >> "$whitelist_v4"
           fi
         done < "$wl_path"
+      elif [[ "$entry" =~ ^[a-zA-Z][a-zA-Z0-9+.-]*:// ]]; then
+        # Reject unknown URL schemes (https://, http://, ftp://, ...). The
+        # WHITELIST array only accepts literal IP/CIDR entries and file://
+        # paths. Silently writing an HTTPS URL into the whitelist would be
+        # ignored by iprange and let the IPs the operator wanted to protect
+        # get blacklisted - the same failure mode the file:// die guards.
+        die "WHITELIST does not support URL scheme in entry: $entry (only literal IP/CIDR or file:// is supported; fetch external lists out-of-band)"
       elif [[ "$entry" == *:* ]]; then
         echo "$entry" >> "$whitelist_v6"
       else
