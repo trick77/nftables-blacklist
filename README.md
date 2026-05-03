@@ -274,15 +274,24 @@ If the file is missing or unreadable, the script aborts before applying any rule
 
 **Recipe: dynamic whitelist from a JSON API**
 
-To whitelist e.g. all Mullvad WireGuard relays (or any other JSON endpoint), schedule a small cron job that writes a flat list using `jq`, then point a `WHITELIST` entry at it:
+To whitelist e.g. all Mullvad WireGuard relays (or any other JSON endpoint), schedule a small cron job that writes a flat list using `jq`, then point a `WHITELIST` entry at it.
+
+Create a new daily cronjob file `/etc/cron.daily/refresh-mullvad-whitelist` with the content (Mullvad is just an example):
 
 ```bash
-# /etc/cron.daily/refresh-mullvad-whitelist
 #!/bin/sh
 curl -fsSL https://api.mullvad.net/app/v1/relays \
   | jq -r '.wireguard.relays[].ipv4_addr_in' \
   > /etc/nftables-blacklist/mullvad.list
 ```
+
+Give the new cronjob file execute permissions:
+
+```bash
+sudo chmod +x /etc/cron.daily/refresh-mullvad-whitelist
+```
+
+Finally, update your `/etc/nftables-blacklist/nftables-blacklist.conf` file:
 
 ```bash
 WHITELIST=(
