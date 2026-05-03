@@ -291,15 +291,26 @@ apply_whitelist() {
   local ip_version="$4"
 
   if [[ "$ip_version" == "4" ]]; then
-    # IPv4: use iprange for proper CIDR subtraction
+    # IPv4: use iprange for proper CIDR subtraction. Fail closed: if iprange
+    # errors out we'd otherwise ship the unfiltered blacklist to nft, which
+    # blacklists exactly the IPs the operator told us to protect - the same
+    # failure mode the file:// missing-file die guards against.
     if ! iprange "$blacklist_file" --except "$whitelist_file" > "$output_file" 2>/dev/null; then
-      log_warn "iprange whitelist filtering failed, copying original"
-      cp "$blacklist_file" "$output_file"
+      die "iprange whitelist filtering failed; aborting to avoid blacklisting whitelisted IPs"
     fi
   else
-    # IPv6: exact match filtering only (iprange doesn't support IPv6)
-    # This means 2001:db8::1 in whitelist won't filter 2001:db8::/32 in blacklist
-    grep -v -F -x -f "$whitelist_file" "$blacklist_file" > "$output_file" 2>/dev/null || cp "$blacklist_file" "$output_file"
+    # IPv6: exact match filtering only (iprange doesn't support IPv6).
+    # This means 2001:db8::1 in whitelist won't filter 2001:db8::/32 in blacklist.
+    # grep exit codes: 0 = matches printed, 1 = no lines matched (legitimate
+    # when every blacklist entry was whitelisted), 2+ = real error. Only the
+    # last case should abort.
+    set +e
+    grep -v -F -x -f "$whitelist_file" "$blacklist_file" > "$output_file" 2>/dev/null
+    local grep_status=$?
+    set -e
+    if [[ $grep_status -gt 1 ]]; then
+      die "grep whitelist filtering failed (exit $grep_status); aborting to avoid blacklisting whitelisted IPs"
+    fi
     log_info "  Note: IPv6 whitelist uses exact matching only"
   fi
 
