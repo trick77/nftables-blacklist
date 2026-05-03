@@ -274,21 +274,57 @@ If the file is missing or unreadable, the script aborts before applying any rule
 
 **Recipe: dynamic whitelist from a JSON API**
 
-To whitelist e.g. all Mullvad WireGuard relays (or any other JSON endpoint), schedule a small cron job that writes a flat list using `jq`, then point a `WHITELIST` entry at it.
+To whitelist e.g. all Mullvad WireGuard relays (or any other JSON endpoint), schedule a small systemd timer that writes a flat list using `jq`, then point a `WHITELIST` entry at it.
 
-Create a new daily cronjob file `/etc/cron.daily/refresh-mullvad-whitelist` with the content (Mullvad is just an example):
+Create the refresh script at `/usr/local/sbin/refresh-mullvad-whitelist.sh` (Mullvad is just an example):
 
 ```bash
+sudo cat <<'EOF' > /usr/local/sbin/refresh-mullvad-whitelist.sh
 #!/bin/sh
 curl -fsSL https://api.mullvad.net/app/v1/relays \
   | jq -r '.wireguard.relays[].ipv4_addr_in' \
   > /etc/nftables-blacklist/mullvad.list
+EOF
+sudo chmod +x /usr/local/sbin/refresh-mullvad-whitelist.sh
 ```
 
-Give the new cronjob file execute permissions:
+Create the service unit:
 
 ```bash
-sudo chmod +x /etc/cron.daily/refresh-mullvad-whitelist
+sudo cat <<'EOF' > /etc/systemd/system/refresh-mullvad-whitelist.service
+[Unit]
+Description=Refresh Mullvad relay IP whitelist
+After=network-online.target
+Wants=network-online.target
+Before=nftables-blacklist-update.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/refresh-mullvad-whitelist.sh
+EOF
+```
+
+Create the timer (fires before the daily blacklist update at 23:33):
+
+```bash
+sudo cat <<'EOF' > /etc/systemd/system/refresh-mullvad-whitelist.timer
+[Unit]
+Description=Refresh Mullvad relay IP whitelist daily
+
+[Timer]
+OnCalendar=*-*-* 23:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+```
+
+Enable it:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now refresh-mullvad-whitelist.timer
 ```
 
 Finally, update your `/etc/nftables-blacklist/nftables-blacklist.conf` file:
@@ -299,7 +335,7 @@ WHITELIST=(
 )
 ```
 
-Run the cron before `update-blacklist.sh` (or schedule the cron earlier in the day). `jq` is the user's tool, not a dependency of this project — use whatever preprocessing you like (`jq`, `awk`, `python`, hand-edited) as long as the result is one IP/CIDR per line.
+`jq` is the user's tool, not a dependency of this project — use whatever preprocessing you like (`jq`, `awk`, `python`, hand-edited) as long as the result is one IP/CIDR per line.
 
 ### Auto-Detect Server IPs
 
