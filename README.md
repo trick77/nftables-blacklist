@@ -230,7 +230,7 @@ BLACKLISTS=(
     "file:///etc/nftables-blacklist/custom.list"
 
     # Public blacklists
-    "https://www.spamhaus.org/drop/drop.lasso"
+    "https://www.spamhaus.org/drop/drop_v4.json"
     "https://lists.blocklist.de/lists/all.txt"
 
     # Ban an entire country (use country code like 'cn', 'ru', etc.)
