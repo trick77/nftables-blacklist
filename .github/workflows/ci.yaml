@@ -45,7 +45,7 @@ jobs:
 
       - name: Upload test artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: unit-test-artifacts
           path: /tmp/bats-*
@@ -69,7 +69,7 @@ jobs:
 
       - name: Upload test artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: integration-test-artifacts
           path: /tmp/bats-*
@@ -93,7 +93,7 @@ jobs:
 
       - name: Upload dry-run artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dry-run-artifacts
           path: /etc/nftables-blacklist/
