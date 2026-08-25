@@ -24,9 +24,8 @@ DRY_RUN=no
 CRON_MODE=no
 CONFIG_FILE=""
 
-
-# Temporary files (set in main, cleaned up on exit)
-declare -a TEMP_FILES=()
+# Scratch directory for this run (created in main, removed on exit)
+TEMP_DIR=""
 
 #=============================================================================
 # UTILITY FUNCTIONS
@@ -76,22 +75,6 @@ die() {
 show_progress() {
   [[ "$CRON_MODE" == "yes" ]] && return 0
   echo -n "."
-}
-
-# Create temp file and register for cleanup
-make_temp() {
-  local tmp
-  tmp=$(mktemp)
-  TEMP_FILES+=("$tmp")
-  echo "$tmp"
-}
-
-# Cleanup temporary files
-cleanup() {
-  for f in "${TEMP_FILES[@]:-}"; do
-    [[ -f "$f" ]] && rm -f "$f" || true
-  done
-  return 0
 }
 
 # Show usage information
@@ -329,7 +312,7 @@ check_nft_table() {
 # Create the complete nftables structure (table, sets, chain)
 create_nft_structure() {
   local nft_script
-  nft_script=$(make_temp)
+  nft_script="$TEMP_DIR/nft_script"
 
   # Build optional forward chain block
   local forward_chain=""
@@ -470,7 +453,13 @@ download_blacklist() {
     200|301|302|000)
       # 200 = OK
       # 301/302 = Redirect (already followed by -L)
-      # 000 = file:// URL
+      # 000 = file:// URL, but also a connection that never produced a
+      #       response at all (DNS failure, refused, reset). Those two are
+      #       only distinguishable by whether anything actually arrived.
+      if [[ ! -s "$output_file" ]]; then
+        log_warn "Empty response (HTTP $http_code): $url"
+        return 1
+      fi
       return 0
       ;;
     503)
@@ -496,7 +485,7 @@ download_all_blacklists() {
     [[ "$url" =~ ^# ]] && continue
 
     local dl_tmp
-    dl_tmp=$(make_temp)
+    dl_tmp=$(mktemp "$TEMP_DIR/dl.XXXXXX")
 
     if download_blacklist "$url" "$dl_tmp"; then
       # Extract IPv4 if enabled
@@ -528,6 +517,11 @@ download_all_blacklists() {
 #=============================================================================
 
 main() {
+  # Scratch dir for every temporary file this run creates. The trap is armed
+  # immediately after mktemp -d succeeds, so nothing can leak from here on.
+  TEMP_DIR=$(mktemp -d)
+  trap 'rm -rf "$TEMP_DIR"' EXIT
+
   # Parse command line arguments
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -561,9 +555,6 @@ main() {
   if [[ -z "$CONFIG_FILE" ]]; then
     die "Please specify a configuration file, e.g. $0 /etc/nftables-blacklist/nftables-blacklist.conf"
   fi
-
-  # Set up cleanup trap
-  trap cleanup EXIT
 
   # Source configuration
   # shellcheck source=nftables-blacklist.conf
@@ -675,10 +666,10 @@ main() {
 
   # Create temporary files for IP collection
   local ipv4_raw ipv6_raw ipv4_clean ipv6_clean
-  ipv4_raw=$(make_temp)
-  ipv6_raw=$(make_temp)
-  ipv4_clean=$(make_temp)
-  ipv6_clean=$(make_temp)
+  ipv4_raw="$TEMP_DIR/ipv4_raw"
+  ipv6_raw="$TEMP_DIR/ipv6_raw"
+  ipv4_clean="$TEMP_DIR/ipv4_clean"
+  ipv6_clean="$TEMP_DIR/ipv6_clean"
 
   if [[ "$CRON_MODE" == "yes" ]]; then
     log_info "Downloading blacklists..."
@@ -703,7 +694,7 @@ main() {
         before_count=$(wc -l < "$ipv4_clean")
 
         local ipv4_optimized
-        ipv4_optimized=$(make_temp)
+        ipv4_optimized="$TEMP_DIR/ipv4_optimized"
 
         if iprange --optimize "$ipv4_clean" > "$ipv4_optimized" 2>/dev/null && [[ -s "$ipv4_optimized" ]]; then
           mv "$ipv4_optimized" "$ipv4_clean"
@@ -726,8 +717,8 @@ main() {
 
   # Apply whitelist filtering (if configured)
   local whitelist_v4 whitelist_v6
-  whitelist_v4=$(make_temp)
-  whitelist_v6=$(make_temp)
+  whitelist_v4="$TEMP_DIR/whitelist_v4"
+  whitelist_v6="$TEMP_DIR/whitelist_v6"
   local has_whitelist=no
 
   # Collect manual whitelist entries.
@@ -775,7 +766,7 @@ main() {
   if [[ "${AUTO_WHITELIST:-no}" == "yes" ]]; then
     log_info "Auto-detecting server IPs for whitelist..."
     local auto_ips
-    auto_ips=$(make_temp)
+    auto_ips="$TEMP_DIR/auto_ips"
     get_server_ips | sort -u > "$auto_ips"
 
     if [[ -s "$auto_ips" ]]; then
@@ -789,6 +780,12 @@ main() {
         log_info "  Whitelisted: $ip"
       done < "$auto_ips"
       has_whitelist=yes
+    else
+      # Detection returns nothing when the host has no public IP on an
+      # interface (any NAT'd VPS) and the external lookups are unreachable.
+      # Carrying on would apply the blacklist with no whitelist at all and
+      # can block this host out of its own SSH - fail closed instead.
+      die "AUTO_WHITELIST=yes but no server IPs detected; aborting to avoid blocking this host"
     fi
   fi
 
@@ -799,7 +796,7 @@ main() {
     if [[ -s "$ipv4_clean" ]] && [[ -s "$whitelist_v4" ]]; then
       log_info "Applying IPv4 whitelist..."
       local ipv4_filtered
-      ipv4_filtered=$(make_temp)
+      ipv4_filtered="$TEMP_DIR/ipv4_filtered"
       before_wl=$(wc -l < "$ipv4_clean")
 
       if apply_whitelist "$ipv4_clean" "$whitelist_v4" "$ipv4_filtered" "4"; then
@@ -813,7 +810,7 @@ main() {
     if [[ -s "$ipv6_clean" ]] && [[ -s "$whitelist_v6" ]]; then
       log_info "Applying IPv6 whitelist..."
       local ipv6_filtered
-      ipv6_filtered=$(make_temp)
+      ipv6_filtered="$TEMP_DIR/ipv6_filtered"
       before_wl=$(wc -l < "$ipv6_clean")
 
       if apply_whitelist "$ipv6_clean" "$whitelist_v6" "$ipv6_filtered" "6"; then
@@ -822,6 +819,13 @@ main() {
         log_info "  Whitelist applied: $before_wl → $after_wl entries ($((before_wl - after_wl)) removed)"
       fi
     fi
+  fi
+
+  # The generated script always flushes both sets before adding elements, so
+  # applying an empty list would silently wipe the live blacklist. Reached on
+  # a network/DNS outage, but guard the flush itself so any cause is covered.
+  if [[ ! -s "$ipv4_clean" ]] && [[ ! -s "$ipv6_clean" ]]; then
+    die "No IPs collected; refusing to apply (would flush the existing blacklist)"
   fi
 
   # Save plain text lists for reference

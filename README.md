@@ -213,7 +213,7 @@ Edit `nftables-blacklist.conf`. Key settings:
 |---------|---------|-------------|
 | `ENABLE_IPV4` | yes | Block IPv4 addresses |
 | `ENABLE_IPV6` | yes | Block IPv6 addresses |
-| `FORCE` | yes | Automatically create the nftables table/sets if they don't exist |
+| `FORCE` | no | Automatically create the nftables table/sets if they don't exist. The shipped config sets `yes`; if you omit the setting entirely the script aborts instead of creating the table |
 | `AUTO_WHITELIST` | no | Auto-detect and whitelist your server's own IPs (setting this to `yes` is recommended) |
 | `BLOCK_FORWARD` | no | Also block blacklisted IPs in the forward chain — forwarded traffic (e.g. to containers) is NOT blocked unless set to `yes` |
 | `NFT_CHAIN_PRIORITY` | -200 | When to check the blacklist (-200 = very early, before most other rules) |
@@ -371,7 +371,7 @@ Adds structured log prefixes (`info:`, `warn:`, `error:`) to all output and supp
 
 ### "nftables table does not exist"
 
-The script creates the nftables table/sets automatically when `FORCE=yes` (the default). If you see this error, make sure `FORCE=yes` in your config.
+The script creates the nftables table/sets automatically when `FORCE=yes`, which the shipped config sets. If you see this error, make sure `FORCE=yes` is present in your config — an omitted `FORCE` is treated as `no`.
 
 ### Check if an IP is blocked
 
