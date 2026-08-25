@@ -395,8 +395,23 @@ generate_nft_script() {
     echo "# nftables-blacklist atomic update"
     echo "# Generated: $(date -Iseconds)"
     echo ""
-    echo "flush set inet ${NFT_TABLE_NAME} ${NFT_SET_NAME_V4}"
-    echo "flush set inet ${NFT_TABLE_NAME} ${NFT_SET_NAME_V6}"
+    # Flush a set only when we are about to repopulate it, or when its family
+    # is disabled and the operator wants it emptied. An enabled family that
+    # collected nothing (its feed was down, or no feed carries that family)
+    # keeps whatever the set already holds - flushing it would silently wipe
+    # the live blacklist, the same failure the "No IPs collected" guard in
+    # main() prevents, one family at a time.
+    if [[ "${ENABLE_IPV4:-yes}" != "yes" ]] || [[ -s "$ipv4_file" ]]; then
+      echo "flush set inet ${NFT_TABLE_NAME} ${NFT_SET_NAME_V4}"
+    else
+      echo "# No IPv4 collected, leaving set ${NFT_SET_NAME_V4} unchanged"
+    fi
+
+    if [[ "${ENABLE_IPV6:-yes}" != "yes" ]] || [[ -s "$ipv6_file" ]]; then
+      echo "flush set inet ${NFT_TABLE_NAME} ${NFT_SET_NAME_V6}"
+    else
+      echo "# No IPv6 collected, leaving set ${NFT_SET_NAME_V6} unchanged"
+    fi
 
     output_chunked_elements "$ipv4_file" "$NFT_SET_NAME_V4" "IPv4 addresses"
     output_chunked_elements "$ipv6_file" "$NFT_SET_NAME_V6" "IPv6 addresses"
@@ -519,7 +534,7 @@ download_all_blacklists() {
 main() {
   # Scratch dir for every temporary file this run creates. The trap is armed
   # immediately after mktemp -d succeeds, so nothing can leak from here on.
-  TEMP_DIR=$(mktemp -d)
+  TEMP_DIR=$(mktemp -d) || die "Cannot create temporary directory"
   trap 'rm -rf "$TEMP_DIR"' EXIT
 
   # Parse command line arguments
@@ -670,6 +685,14 @@ main() {
   ipv6_raw="$TEMP_DIR/ipv6_raw"
   ipv4_clean="$TEMP_DIR/ipv4_clean"
   ipv6_clean="$TEMP_DIR/ipv6_clean"
+
+  # Create them up front. A family that collects nothing never gets its file
+  # written, and the later wc/cat/grep reads would then fail their input
+  # redirection instead of simply seeing an empty list.
+  : > "$ipv4_raw"
+  : > "$ipv6_raw"
+  : > "$ipv4_clean"
+  : > "$ipv6_clean"
 
   if [[ "$CRON_MODE" == "yes" ]]; then
     log_info "Downloading blacklists..."
@@ -826,6 +849,18 @@ main() {
   # a network/DNS outage, but guard the flush itself so any cause is covered.
   if [[ ! -s "$ipv4_clean" ]] && [[ ! -s "$ipv6_clean" ]]; then
     die "No IPs collected; refusing to apply (would flush the existing blacklist)"
+  fi
+
+  # One family can come up empty while the other has data (a feed that only
+  # carries IPv4, or the single IPv6 feed being down). The generated script
+  # leaves that set alone instead of flushing it - say so, since the set then
+  # keeps the entries from an earlier run.
+  if [[ "${ENABLE_IPV4:-yes}" == "yes" ]] && [[ ! -s "$ipv4_clean" ]]; then
+    log_info "No IPv4 addresses collected; leaving the existing IPv4 set unchanged"
+  fi
+
+  if [[ "${ENABLE_IPV6:-yes}" == "yes" ]] && [[ ! -s "$ipv6_clean" ]]; then
+    log_info "No IPv6 addresses collected; leaving the existing IPv6 set unchanged"
   fi
 
   # Save plain text lists for reference
