@@ -48,6 +48,7 @@ Blacklist update complete
   - [Auto-Detect Server IPs](#auto-detect-server-ips)
 - [Dry Run Mode](#dry-run-mode)
 - [Cron Mode](#cron-mode)
+- [Command-Line Help](#command-line-help)
 - [Troubleshooting](#troubleshooting)
 - [Migrating from the old ipset/iptables version](#migrating-from-the-old-ipsetiptables-version)
 - [Uninstall](#uninstall)
@@ -98,6 +99,8 @@ Blacklist update complete
    ```bash
    sudo nano /etc/nftables-blacklist/nftables-blacklist.conf
    ```
+
+   At minimum, `BLACKLISTS` must contain at least one URL or `file://` entry — the script refuses to run without it.
 
 5. **Run initial update:**
    ```bash
@@ -211,11 +214,14 @@ Edit `nftables-blacklist.conf`. Key settings:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
+| `BLACKLISTS` | *(required)* | Array of blacklist URLs / `file://` entries. The script aborts with a clear error if this is not set. |
 | `ENABLE_IPV4` | yes | Block IPv4 addresses |
 | `ENABLE_IPV6` | yes | Block IPv6 addresses |
 | `FORCE` | yes | Automatically create the nftables table/sets if they don't exist |
 | `AUTO_WHITELIST` | no | Auto-detect and whitelist your server's own IPs (setting this to `yes` is recommended) |
 | `BLOCK_FORWARD` | no | Also block blacklisted IPs in the forward chain — forwarded traffic (e.g. to containers) is NOT blocked unless set to `yes` |
+| `NFT_BLACKLIST_SCRIPT` | `/etc/nftables-blacklist/blacklist.nft` | Where the generated nftables update script is written |
+| `IP_BLACKLIST` | `/etc/nftables-blacklist/ip-blacklist.list` | Where the plain-text IP list is written (with `.v4`/`.v6` suffixes) |
 | `NFT_CHAIN_PRIORITY` | -200 | When to check the blacklist (-200 = very early, before most other rules) |
 | `CURL_CONNECT_TIMEOUT` | 10 | Seconds to wait for blacklist server connection |
 | `CURL_MAX_TIME` | 30 | Maximum seconds per blacklist download |
@@ -238,6 +244,7 @@ BLACKLISTS=(
 )
 ```
 
+`BLACKLISTS` is required — the script checks for it on startup and aborts with a clear error if the array is missing or empty, rather than failing later with a confusing shell error.
 
 ## Whitelist (Prevent Self-Blocking)
 
@@ -258,6 +265,8 @@ WHITELIST=(
 For IPv4, whitelisting a range like `10.0.0.0/8` will correctly exclude all IPs in that range, even if the blacklist contains individual IPs like `10.1.2.3`.
 
 **Note:** IPv6 whitelist only matches exact addresses (CIDR ranges not supported for IPv6 whitelist).
+
+**Fail-closed behavior:** if IPv4 whitelist filtering itself fails (for example because `iprange` errors out), the script aborts the entire run instead of falling back to the unfiltered blacklist. This is intentional: shipping an unfiltered blacklist could end up blocking exactly the IPs you configured the whitelist to protect. If you rely on `AUTO_WHITELIST` or a `file://` whitelist, keep this in mind if a run stops unexpectedly with an `iprange whitelist filtering failed` error.
 
 ### External whitelist files
 
@@ -367,11 +376,23 @@ update-blacklist.sh --cron /etc/nftables-blacklist/nftables-blacklist.conf
 
 Adds structured log prefixes (`info:`, `warn:`, `error:`) to all output and suppresses interactive formatting (progress dots, blank lines). This makes the output easier to filter with tools like logcheck or parse in journalctl and log files.
 
+## Command-Line Help
+
+Run with `--help` (or `-h`) at any time to print a summary of available options and usage examples without touching any nftables state or configuration:
+
+```bash
+update-blacklist.sh --help
+```
+
 ## Troubleshooting
 
 ### "nftables table does not exist"
 
-The script creates the nftables table/sets automatically when `FORCE=yes` (the default). If you see this error, make sure `FORCE=yes` in your config.
+The script creates the nftables table/sets automatically when `FORCE=yes` (the default). If you see this error, make sure `FORCE` isn't explicitly set to `no` in your config.
+
+### "BLACKLISTS is not set in the configuration file"
+
+`BLACKLISTS` is required. Add at least one entry to the `BLACKLISTS` array in your config, either a public blacklist URL or a `file://` path to a local list — see [Customizing Blacklists](#customizing-blacklists).
 
 ### Check if an IP is blocked
 
@@ -483,4 +504,3 @@ After these steps, no traces of the blacklist remain and all previously blocked 
 Found a bug? Pull requests with fixes are always welcome.
 
 This project intentionally keeps a narrow focus, so install scripts, additional OS/distro support, and feature additions won't be merged. If you have something bigger in mind, you're welcome to fork and make it your own.
-
