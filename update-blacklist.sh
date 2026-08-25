@@ -386,8 +386,11 @@ output_chunked_elements() {
 }
 
 # Generate nftables script for atomic update
+# Args: $1=ipv4 list, $2=ipv6 list, $3=output script,
+#       $4=ipv4 raw download, $5=ipv6 raw download
 generate_nft_script() {
   local ipv4_file="$1" ipv6_file="$2" output_script="$3"
+  local ipv4_raw_file="$4" ipv6_raw_file="$5"
 
   {
     echo "#!/usr/sbin/nft -f"
@@ -395,19 +398,26 @@ generate_nft_script() {
     echo "# nftables-blacklist atomic update"
     echo "# Generated: $(date -Iseconds)"
     echo ""
-    # Flush a set only when we are about to repopulate it, or when its family
-    # is disabled and the operator wants it emptied. An enabled family that
-    # collected nothing (its feed was down, or no feed carries that family)
-    # keeps whatever the set already holds - flushing it would silently wipe
-    # the live blacklist, the same failure the "No IPs collected" guard in
-    # main() prevents, one family at a time.
-    if [[ "${ENABLE_IPV4:-yes}" != "yes" ]] || [[ -s "$ipv4_file" ]]; then
+    # Flush a set unless this run collected nothing for that family. An
+    # enabled family whose downloads produced no addresses (its feed was
+    # down, or no feed carries that family) keeps whatever the set already
+    # holds - flushing it would silently wipe the live blacklist, the same
+    # failure the "No IPs collected" guard in main() prevents, one family
+    # at a time.
+    #
+    # The decision keys on the RAW download, not on the processed list: a
+    # family whose entries were all removed by private-range filtering or
+    # by the whitelist did collect addresses, and its set must still be
+    # flushed. Keying on the processed list would leave whitelisted
+    # addresses blocked in the live set forever, because the flush that
+    # would remove them never gets emitted.
+    if [[ "${ENABLE_IPV4:-yes}" != "yes" ]] || [[ -s "$ipv4_raw_file" ]]; then
       echo "flush set inet ${NFT_TABLE_NAME} ${NFT_SET_NAME_V4}"
     else
       echo "# No IPv4 collected, leaving set ${NFT_SET_NAME_V4} unchanged"
     fi
 
-    if [[ "${ENABLE_IPV6:-yes}" != "yes" ]] || [[ -s "$ipv6_file" ]]; then
+    if [[ "${ENABLE_IPV6:-yes}" != "yes" ]] || [[ -s "$ipv6_raw_file" ]]; then
       echo "flush set inet ${NFT_TABLE_NAME} ${NFT_SET_NAME_V6}"
     else
       echo "# No IPv6 collected, leaving set ${NFT_SET_NAME_V6} unchanged"
@@ -516,6 +526,11 @@ download_all_blacklists() {
       ((success_count++)) || true
       show_progress
     fi
+
+    # Drop the downloaded body as soon as it has been extracted. Keeping every
+    # feed's payload until the run exits piles up tens of MB in the scratch
+    # dir for no reason; a failed download can leave a partial body too.
+    rm -f "$dl_tmp"
   done
 
   log_info ""
@@ -534,8 +549,13 @@ download_all_blacklists() {
 main() {
   # Scratch dir for every temporary file this run creates. The trap is armed
   # immediately after mktemp -d succeeds, so nothing can leak from here on.
+  # The path is baked into the trap now, on purpose: the configuration file is
+  # sourced later and a config that happened to assign TEMP_DIR would
+  # otherwise redirect this "rm -rf", which runs as root. mktemp -d output
+  # cannot contain a single quote, so the quoting below is safe.
   TEMP_DIR=$(mktemp -d) || die "Cannot create temporary directory"
-  trap 'rm -rf "$TEMP_DIR"' EXIT
+  # shellcheck disable=SC2064 # expand TEMP_DIR now, see above
+  trap "rm -rf -- '$TEMP_DIR'" EXIT
 
   # Parse command line arguments
   while [[ $# -gt 0 ]]; do
@@ -844,10 +864,15 @@ main() {
     fi
   fi
 
-  # The generated script always flushes both sets before adding elements, so
-  # applying an empty list would silently wipe the live blacklist. Reached on
+  # Applying an empty list would silently wipe the live blacklist. Reached on
   # a network/DNS outage, but guard the flush itself so any cause is covered.
-  if [[ ! -s "$ipv4_clean" ]] && [[ ! -s "$ipv6_clean" ]]; then
+  #
+  # Like the flush decision in generate_nft_script(), this keys on the raw
+  # downloads: a run that collected addresses and then filtered every one of
+  # them out (private ranges, whitelist) produced a legitimately empty list
+  # and must be applied, or the entries the operator just whitelisted stay
+  # blocked.
+  if [[ ! -s "$ipv4_raw" ]] && [[ ! -s "$ipv6_raw" ]]; then
     die "No IPs collected; refusing to apply (would flush the existing blacklist)"
   fi
 
@@ -855,11 +880,11 @@ main() {
   # carries IPv4, or the single IPv6 feed being down). The generated script
   # leaves that set alone instead of flushing it - say so, since the set then
   # keeps the entries from an earlier run.
-  if [[ "${ENABLE_IPV4:-yes}" == "yes" ]] && [[ ! -s "$ipv4_clean" ]]; then
+  if [[ "${ENABLE_IPV4:-yes}" == "yes" ]] && [[ ! -s "$ipv4_raw" ]]; then
     log_info "No IPv4 addresses collected; leaving the existing IPv4 set unchanged"
   fi
 
-  if [[ "${ENABLE_IPV6:-yes}" == "yes" ]] && [[ ! -s "$ipv6_clean" ]]; then
+  if [[ "${ENABLE_IPV6:-yes}" == "yes" ]] && [[ ! -s "$ipv6_raw" ]]; then
     log_info "No IPv6 addresses collected; leaving the existing IPv6 set unchanged"
   fi
 
@@ -878,7 +903,8 @@ main() {
   log_info "Generating nftables script..."
 
   # Generate atomic update script
-  generate_nft_script "$ipv4_clean" "$ipv6_clean" "$NFT_BLACKLIST_SCRIPT"
+  generate_nft_script "$ipv4_clean" "$ipv6_clean" "$NFT_BLACKLIST_SCRIPT" \
+    "$ipv4_raw" "$ipv6_raw"
 
   log_info "Applying nftables rules..."
 
