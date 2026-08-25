@@ -599,9 +599,19 @@ main() {
     : "${ENABLE_IPV4:=yes}"
     : "${ENABLE_IPV6:=yes}"
     : "${BLOCK_FORWARD:=no}"
+    : "${FORCE:=yes}"
     : "${CHUNK_SIZE:=5000}"
     : "${CURL_CONNECT_TIMEOUT:=10}"
     : "${CURL_MAX_TIME:=30}"
+    : "${NFT_BLACKLIST_SCRIPT:=/etc/nftables-blacklist/blacklist.nft}"
+    : "${IP_BLACKLIST:=/etc/nftables-blacklist/ip-blacklist.list}"
+
+    # BLACKLISTS is mandatory: without it, later bare uses of ${BLACKLISTS[@]}
+    # would abort with a raw "unbound variable" error under set -u instead of
+    # a clear message.
+    if [[ -z "${BLACKLISTS[*]:-}" ]]; then
+        die "BLACKLISTS is not set in the configuration file. Add at least one URL or file:// entry."
+    fi
 
     # Validate required commands
     local required_cmds=(curl grep sed sort wc iprange)
@@ -632,8 +642,8 @@ main() {
 
     # Validate output directories exist
     local script_dir list_dir
-    script_dir=$(dirname "${NFT_BLACKLIST_SCRIPT:-/etc/nftables-blacklist/blacklist.nft}")
-    list_dir=$(dirname "${IP_BLACKLIST:-/etc/nftables-blacklist/ip-blacklist.list}")
+    script_dir=$(dirname "$NFT_BLACKLIST_SCRIPT")
+    list_dir=$(dirname "$IP_BLACKLIST")
 
     if [[ ! -d "$script_dir" ]]; then
         die "Directory does not exist: $script_dir (create it or update NFT_BLACKLIST_SCRIPT in config)"
