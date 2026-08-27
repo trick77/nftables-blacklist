@@ -4,6 +4,12 @@
 [![Bash 4.0+](https://img.shields.io/badge/bash-4.0%2B-blue)](https://www.gnu.org/software/bash/)
 [![License](https://img.shields.io/github/license/trick77/nftables-blacklist)](LICENSE)
 
+> 🪦 **RIP 766 stars and 181 forks, 2013 to 25 August 2026.** This repo survived thirteen years and a spell in the Arctic Code Vault, then a coding agent I was running flipped it private for about two minutes. GitHub responded by vaporising every star and cutting every fork loose. The code is fine. My pride is not.
+>
+> **If you forked before that date:** your copy still works, it is just an orphan now. To keep pulling updates: `git remote add upstream https://github.com/trick77/nftables-blacklist.git`. To open a PR you will need a fresh fork, because GitHub only accepts them from forks in the current network. That one is on me, sorry.
+>
+> **If you had starred it:** yours is gone too. A re-star is appreciated, but the script works either way.
+
 > 📢 Freshly defrosted from the GitHub Arctic Code Vault and upgraded from iptables to nftables. Yes, the nftables syntax is... an acquired taste. But I finally bow to the netfilter overlords.
 >
 > **Early stage** - expect bugs.
