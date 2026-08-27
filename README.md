@@ -10,8 +10,6 @@
 >
 > **If you had starred it:** yours is gone too. A re-star is appreciated, but the script works either way.
 
-> 📢 Freshly defrosted from the GitHub Arctic Code Vault and upgraded from iptables to nftables. Yes, the nftables syntax is... an acquired taste. But I finally bow to the netfilter overlords.
->
 > **Early stage** - expect bugs.
 
 A Bash script that automatically downloads public IP blacklists and blocks them using nftables to keep script kiddies, botnets, and other unwanted traffic off your Linux server. Supports IPv4, IPv6, and CIDR aggregation with built-in whitelisting, cron scheduling, and automatic server IP detection.
