@@ -4,22 +4,16 @@
 
 ## How it was tested
 
-Paste the actual output of:
-
-    ./update-blacklist.sh --dry-run test/nftables-blacklist.conf
+Paste the real output of the checks in CONTRIBUTING.md - at minimum the dry-run and both
+bats runs:
 
 ```
 (paste here)
 ```
 
-If your change touches tested logic, also paste the `bats` summary line.
-
 ## Confirmation
 
 - [ ] I have read every line of this change myself and I understand what it does.
-- [ ] I ran the command above on my own machine and the output above is the real output.
+- [ ] I ran the checks in CONTRIBUTING.md on my own machine and they all pass.
+- [ ] The output above is real, not a description of what I expect.
 - [ ] This is not unreviewed AI output.
-
-Replace the line below with your own words - do not leave it as is:
-
-> How I verified this works:
