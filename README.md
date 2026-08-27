@@ -6,11 +6,9 @@
 
 > ⭐ This repo survived thirteen years and a spell in the Arctic Code Vault, then a coding agent I was running flipped it private for about two minutes. GitHub responded by vaporising all 766 stars and cutting all 181 forks loose. The code is fine. My pride is not.
 >
-> **If you forked before that date:** your copy still works, it is just an orphan now. To keep pulling updates: `git remote add upstream https://github.com/trick77/nftables-blacklist.git`.
+> **If you forked before 25 August 2026:** your copy still works, it is just no longer linked here. Re-fork if you want GitHub's "Sync fork" button back.
 >
 > **If you had starred it:** yours is gone too. A re-star is appreciated, but the script works either way.
-
-> **Early stage** - expect bugs.
 
 A Bash script that automatically downloads public IP blacklists and blocks them using nftables to keep script kiddies, botnets, and other unwanted traffic off your Linux server. Supports IPv4, IPv6, and CIDR aggregation with built-in whitelisting, cron scheduling, and automatic server IP detection.
 
