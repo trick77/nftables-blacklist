@@ -6,12 +6,7 @@
 
 > ⭐ This repo survived thirteen years and a spell in the Arctic Code Vault, then a coding agent I was running flipped it private for about two minutes. GitHub responded by vaporising all 766 stars and cutting all 181 forks loose. The code is fine. My pride is not.
 >
-> **If you forked before 25 August 2026:** your copy still works, it is just no longer linked here. If you want to keep it in sync, do it by hand:
->
-> ```
-> git remote add upstream https://github.com/trick77/nftables-blacklist.git
-> git checkout master && git fetch upstream && git merge upstream/master && git push origin master
-> ```
+> **If you forked before 25 August 2026:** your copy still works, it is just no longer linked here. Re-fork if you want GitHub's "Sync fork" button back.
 >
 > **If you had starred it:** yours is gone too. A re-star is appreciated, but the script works either way.
 
