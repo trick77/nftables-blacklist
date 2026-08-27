@@ -89,7 +89,6 @@ nbbuild/
 nbdist/
 
 # Agentic Coding Tools
-AGENTS.md
 .cursor/
 .cursorignore
 .windsurf/
