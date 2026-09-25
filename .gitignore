@@ -103,3 +103,6 @@ nbdist/
 .env.local
 .env.*.local
 *.pid
+
+# Local git worktrees
+.agents/worktrees/
