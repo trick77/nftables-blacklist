@@ -99,6 +99,7 @@ nbdist/
 .cody/
 .tabnine/
 .claude/
+.agents/
 .env
 .env.local
 .env.*.local
